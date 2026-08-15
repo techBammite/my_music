@@ -1,0 +1,99 @@
+name: Deploy My Music to AWS
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  terraform-and-deploy:
+    name: Terraform Apply & Application Deployment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-3' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0
+
+      - name: Terraform Format Check
+        run: terraform fmt -check
+        working-directory: ./infra
+        continue-on-error: true
+
+      - name: Terraform Init
+        run: terraform init
+        working-directory: ./infra
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ./infra
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve
+        working-directory: ./infra
+
+      - name: Package Application Artifact
+        run: |
+          echo "Packaging application code..."
+          zip -r app.zip . -x "node_modules/*" ".git/*" "infra/*" ".github/*" "uploads/*"
+
+      - name: Upload Release Artifact to S3
+        run: |
+          DEPLOY_BUCKET=$(cd infra && terraform output -raw s3_deploy_bucket_name)
+          echo "Uploading app.zip to s3://$DEPLOY_BUCKET/latest/app.zip"
+          aws s3 cp app.zip "s3://$DEPLOY_BUCKET/latest/app.zip"
+          aws s3 cp app.zip "s3://$DEPLOY_BUCKET/releases/app-${{ github.sha }}.zip"
+
+      - name: Trigger EC2 Auto Scaling Group Instance Refresh
+        run: |
+          ASG_NAME=$(aws autoscaling describe-auto-scaling-groups --query "AutoScalingGroups[?contains(AutoScalingGroupName, 'mymusic-asg')].AutoScalingGroupName" --output text)
+          if [ -n "$ASG_NAME" ]; then
+            echo "Triggering Instance Refresh on ASG: $ASG_NAME"
+            aws autoscaling start-instance-refresh --auto-scaling-group-name "$ASG_NAME" --preferences '{"MinHealthyPercentage": 50}'
+          else
+            echo "ASG not found, skipping Instance Refresh."
+          fi
+
+      - name: Display Deployment Endpoints
+        run: |
+          ALB_URL=$(cd infra && terraform output -raw alb_dns_name)
+          CF_URL=$(cd infra && terraform output -raw cloudfront_domain_name)
+          echo "=========================================================="
+          echo "🎉 DÉPLOIEMENT RÉUSSI SUR AWS !"
+          echo "=========================================================="
+          echo "🌐 URL Application Load Balancer : http://$ALB_URL"
+          echo "⚡ URL CloudFront CDN            : https://$CF_URL"
+          echo "=========================================================="
+          echo "ALB_URL=http://$ALB_URL" >> $GITHUB_ENV
+          echo "CF_URL=https://$CF_URL" >> $GITHUB_ENV
+
+          echo "## 🚀 URLs de votre Application Déployée" >> $GITHUB_STEP_SUMMARY
+          echo "- **Application Load Balancer** : [http://$ALB_URL](http://$ALB_URL)" >> $GITHUB_STEP_SUMMARY
+          echo "- **CloudFront CDN (HTTPS)** : [https://$CF_URL](https://$CF_URL)" >> $GITHUB_STEP_SUMMARY

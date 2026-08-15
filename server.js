@@ -148,6 +148,12 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.method === 'GET' && (pathname === '/healthz' || pathname === '/health')) {
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }));
+    return;
+  }
+
   if (req.method === 'GET' && pathname === '/api/musiques') {
     await getAllMusiques(req, res);
     return;

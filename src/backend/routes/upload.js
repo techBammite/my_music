@@ -1,10 +1,10 @@
 const Busboy = require('busboy');
 const fs = require('fs');
 const path = require('path');
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
 
 const uploadDir = path.join(__dirname, '..', '..', '..', 'uploads');
 
-// S'assurer que le dossier uploads existe
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -27,7 +27,8 @@ function handleUpload(req, res) {
 
   let fileSaved = false;
   let filename = '';
-  let writeStreamError = null;
+  let writeError = null;
+  let uploadPromise = Promise.resolve();
 
   busboy.on('file', (name, file, info) => {
     const { filename: originalName, mimeType } = info;
@@ -38,7 +39,7 @@ function handleUpload(req, res) {
     ];
 
     if (!allowedTypes.includes(mimeType)) {
-      file.resume(); // Ignorer le contenu du fichier
+      file.resume();
       res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify({ success: false, error: 'Type de fichier non autorisé' }));
       return;
@@ -46,16 +47,45 @@ function handleUpload(req, res) {
 
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
     filename = uniqueSuffix + path.extname(originalName);
-    const saveTo = path.join(uploadDir, filename);
 
-    const fstream = fs.createWriteStream(saveTo);
-    file.pipe(fstream);
+    const bucketName = process.env.AWS_S3_BUCKET;
 
-    fstream.on('error', (err) => {
-      writeStreamError = err;
-    });
+    if (bucketName) {
+      // Stream vers S3
+      const chunks = [];
+      file.on('data', (chunk) => chunks.push(chunk));
+      
+      uploadPromise = new Promise((resolve) => {
+        file.on('end', async () => {
+          try {
+            const buffer = Buffer.concat(chunks);
+            const s3Client = new S3Client({ region: process.env.AWS_REGION || 'eu-west-3' });
+            await s3Client.send(new PutObjectCommand({
+              Bucket: bucketName,
+              Key: `uploads/${filename}`,
+              Body: buffer,
+              ContentType: mimeType
+            }));
+            fileSaved = true;
+            resolve();
+          } catch (err) {
+            writeError = err;
+            resolve();
+          }
+        });
+      });
+    } else {
+      // Stockage local
+      const saveTo = path.join(uploadDir, filename);
+      const fstream = fs.createWriteStream(saveTo);
+      file.pipe(fstream);
 
-    fileSaved = true;
+      fstream.on('error', (err) => {
+        writeError = err;
+      });
+
+      fileSaved = true;
+    }
   });
 
   busboy.on('error', (err) => {
@@ -63,12 +93,14 @@ function handleUpload(req, res) {
     res.end(JSON.stringify({ success: false, error: err.message }));
   });
 
-  busboy.on('finish', () => {
+  busboy.on('finish', async () => {
+    await uploadPromise;
+
     if (res.writableEnded) return;
 
-    if (writeStreamError) {
+    if (writeError) {
       res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8' });
-      res.end(JSON.stringify({ success: false, error: 'Erreur lors de la sauvegarde du fichier : ' + writeStreamError.message }));
+      res.end(JSON.stringify({ success: false, error: 'Erreur lors de la sauvegarde du fichier : ' + writeError.message }));
       return;
     }
 
