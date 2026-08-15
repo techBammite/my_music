@@ -1,6 +1,6 @@
 # Subnet Group pour RDS dans les subnets prives DB
 resource "aws_db_subnet_group" "main" {
-  name       = "mymusic-db-subnet-group"
+  name       = "mymusic-db-subnet-group-${random_id.suffix.hex}"
   subnet_ids = aws_subnet.private_db[*].id
 
   tags = {
@@ -8,9 +8,9 @@ resource "aws_db_subnet_group" "main" {
   }
 }
 
-# Instance RDS MySQL Multi-AZ
+# Instance RDS MySQL
 resource "aws_db_instance" "mysql" {
-  identifier            = "mymusic-db"
+  identifier            = "mymusic-db-${random_id.suffix.hex}"
   allocated_storage     = 20
   max_allocated_storage = 50
   storage_type          = "gp2"

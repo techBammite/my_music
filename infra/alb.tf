@@ -1,6 +1,6 @@
 # Application Load Balancer (ALB)
 resource "aws_lb" "main" {
-  name               = "mymusic-alb"
+  name               = "mymusic-alb-${random_id.suffix.hex}"
   internal           = false
   load_balancer_type = "application"
   security_groups    = [aws_security_group.alb.id]
@@ -15,7 +15,7 @@ resource "aws_lb" "main" {
 
 # Target Group pour les instances EC2 Node.js
 resource "aws_lb_target_group" "app" {
-  name     = "mymusic-tg"
+  name     = "mymusic-tg-${random_id.suffix.hex}"
   port     = var.app_port
   protocol = "HTTP"
   vpc_id   = aws_vpc.main.id

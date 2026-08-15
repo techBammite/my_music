@@ -1,6 +1,6 @@
 # Security Group pour Application Load Balancer
 resource "aws_security_group" "alb" {
-  name        = "mymusic-alb-sg"
+  name        = "mymusic-alb-sg-${random_id.suffix.hex}"
   description = "Autorise le trafic HTTP et HTTPS entrant vers ALB"
   vpc_id      = aws_vpc.main.id
 
@@ -35,7 +35,7 @@ resource "aws_security_group" "alb" {
 
 # Security Group pour les instances EC2 App
 resource "aws_security_group" "ec2" {
-  name        = "mymusic-ec2-sg"
+  name        = "mymusic-ec2-sg-${random_id.suffix.hex}"
   description = "Autorise le trafic vers application Node.js depuis ALB uniquement"
   vpc_id      = aws_vpc.main.id
 
@@ -62,7 +62,7 @@ resource "aws_security_group" "ec2" {
 
 # Security Group pour la base de donnees RDS MySQL
 resource "aws_security_group" "rds" {
-  name        = "mymusic-rds-sg"
+  name        = "mymusic-rds-sg-${random_id.suffix.hex}"
   description = "Autorise les connexions MySQL depuis EC2 uniquement"
   vpc_id      = aws_vpc.main.id
 
