@@ -11,14 +11,6 @@ terraform {
       version = "~> 3.5"
     }
   }
-
-  # Le backend S3 nécessite que le bucket existe au préalable.
-  # backend "s3" {
-  #   bucket         = "mymusic-deploy-v1"
-  #   key            = "terraform.tfstate"
-  #   region         = "eu-west-3"
-  #   encrypt        = true
-  # }
 }
 
 provider "aws" {
@@ -31,4 +23,12 @@ provider "aws" {
       ManagedBy   = "Terraform"
     }
   }
+}
+
+resource "random_id" "suffix" {
+  byte_length = 4
+}
+
+locals {
+  suffix = random_id.suffix.hex
 }

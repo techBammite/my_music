@@ -54,6 +54,26 @@ jobs:
         run: terraform validate
         working-directory: ./infra
 
+      - name: Cleanup Old Test VPCs
+        run: |
+          echo "Automated Cleanup: Deleting any old failed test VPCs..."
+          VPC_IDS=$(aws ec2 describe-vpcs --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --query "Vpcs[?contains(Tags[?Key=='Name'].Value | [0], 'mymusic-vpc')].VpcId" --output text)
+          for vpc_id in $VPC_IDS; do
+            if [ -n "$vpc_id" ]; then
+              echo "Cleaning up VPC: $vpc_id"
+              IGW_ID=$(aws ec2 describe-internet-gateways --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --filters "Name=attachment.vpc-id,Values=$vpc_id" --query "InternetGateways[*].InternetGatewayId" --output text)
+              if [ -n "$IGW_ID" ]; then
+                aws ec2 detach-internet-gateway --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --internet-gateway-id "$IGW_ID" --vpc-id "$vpc_id" || true
+                aws ec2 delete-internet-gateway --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --internet-gateway-id "$IGW_ID" || true
+              fi
+              SUBNET_IDS=$(aws ec2 describe-subnets --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --filters "Name=vpc-id,Values=$vpc_id" --query "Subnets[*].SubnetId" --output text)
+              for sub_id in $SUBNET_IDS; do
+                aws ec2 delete-subnet --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --subnet-id "$sub_id" || true
+              done
+              aws ec2 delete-vpc --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --vpc-id "$vpc_id" || true
+            fi
+          done
+
       - name: Terraform Apply
         id: apply
         run: terraform apply -auto-approve

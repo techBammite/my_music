@@ -1,7 +1,3 @@
-locals {
-  suffix = "v1" # Suffixe propre pour le deploiement
-}
-
 # Bucket S3 pour les médias (audios et couvertures)
 resource "aws_s3_bucket" "media" {
   bucket        = "mymusic-media-${local.suffix}"
