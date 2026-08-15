@@ -57,18 +57,22 @@ jobs:
       - name: Cleanup Old Test VPCs
         run: |
           echo "Automated Cleanup: Deleting any old failed test VPCs..."
-          VPC_IDS=$(aws ec2 describe-vpcs --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --query "Vpcs[?contains(Tags[?Key=='Name'].Value | [0], 'mymusic-vpc')].VpcId" --output text)
+          VPC_IDS=$(aws ec2 describe-vpcs --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --filters "Name=tag:Name,Values=*mymusic-vpc*" --query "Vpcs[*].VpcId" --output text || echo "")
           for vpc_id in $VPC_IDS; do
-            if [ -n "$vpc_id" ]; then
+            if [ -n "$vpc_id" ] && [ "$vpc_id" != "None" ]; then
               echo "Cleaning up VPC: $vpc_id"
-              IGW_ID=$(aws ec2 describe-internet-gateways --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --filters "Name=attachment.vpc-id,Values=$vpc_id" --query "InternetGateways[*].InternetGatewayId" --output text)
-              if [ -n "$IGW_ID" ]; then
-                aws ec2 detach-internet-gateway --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --internet-gateway-id "$IGW_ID" --vpc-id "$vpc_id" || true
-                aws ec2 delete-internet-gateway --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --internet-gateway-id "$IGW_ID" || true
-              fi
-              SUBNET_IDS=$(aws ec2 describe-subnets --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --filters "Name=vpc-id,Values=$vpc_id" --query "Subnets[*].SubnetId" --output text)
+              IGW_IDS=$(aws ec2 describe-internet-gateways --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --filters "Name=attachment.vpc-id,Values=$vpc_id" --query "InternetGateways[*].InternetGatewayId" --output text || echo "")
+              for igw_id in $IGW_IDS; do
+                if [ -n "$igw_id" ] && [ "$igw_id" != "None" ]; then
+                  aws ec2 detach-internet-gateway --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --internet-gateway-id "$igw_id" --vpc-id "$vpc_id" || true
+                  aws ec2 delete-internet-gateway --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --internet-gateway-id "$igw_id" || true
+                fi
+              done
+              SUBNET_IDS=$(aws ec2 describe-subnets --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --filters "Name=vpc-id,Values=$vpc_id" --query "Subnets[*].SubnetId" --output text || echo "")
               for sub_id in $SUBNET_IDS; do
-                aws ec2 delete-subnet --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --subnet-id "$sub_id" || true
+                if [ -n "$sub_id" ] && [ "$sub_id" != "None" ]; then
+                  aws ec2 delete-subnet --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --subnet-id "$sub_id" || true
+                fi
               done
               aws ec2 delete-vpc --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --vpc-id "$vpc_id" || true
             fi
