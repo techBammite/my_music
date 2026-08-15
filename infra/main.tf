@@ -12,12 +12,13 @@ terraform {
     }
   }
 
-  backend "s3" {
-    bucket  = "mymusic-deploy-d62d99a1"
-    key     = "terraform/state/terraform.tfstate"
-    region  = "eu-west-3"
-    encrypt = true
-  }
+  # Le backend S3 nécessite que le bucket existe au préalable.
+  # backend "s3" {
+  #   bucket         = "mymusic-deploy-v1"
+  #   key            = "terraform.tfstate"
+  #   region         = "eu-west-3"
+  #   encrypt        = true
+  # }
 }
 
 provider "aws" {

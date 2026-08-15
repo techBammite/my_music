@@ -1,5 +1,5 @@
 locals {
-  suffix = "d62d99a1" # Suffixe fixe pour réutiliser le même bucket et éviter la création de doublons
+  suffix = "v1" # Suffixe propre pour le deploiement
 }
 
 # Bucket S3 pour les médias (audios et couvertures)
