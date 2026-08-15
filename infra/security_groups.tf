@@ -2,7 +2,7 @@
 resource "aws_security_group" "alb" {
   name        = "mymusic-alb-sg-${local.suffix}"
   description = "Autorise le trafic HTTP et HTTPS entrant vers ALB"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
     description = "HTTP depuis Internet"
@@ -37,7 +37,7 @@ resource "aws_security_group" "alb" {
 resource "aws_security_group" "ec2" {
   name        = "mymusic-ec2-sg-${local.suffix}"
   description = "Autorise le trafic vers application Node.js depuis ALB uniquement"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
     description     = "Trafic Node.js depuis ALB"
@@ -64,7 +64,7 @@ resource "aws_security_group" "ec2" {
 resource "aws_security_group" "rds" {
   name        = "mymusic-rds-sg-${local.suffix}"
   description = "Autorise les connexions MySQL depuis EC2 uniquement"
-  vpc_id      = aws_vpc.main.id
+  vpc_id      = data.aws_vpc.default.id
 
   ingress {
     description     = "MySQL depuis EC2 SG"

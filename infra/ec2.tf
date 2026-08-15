@@ -89,7 +89,7 @@ resource "aws_launch_template" "app" {
   }
 
   network_interfaces {
-    associate_public_ip_address = false
+    associate_public_ip_address = true
     security_groups             = [aws_security_group.ec2.id]
   }
 
@@ -97,7 +97,7 @@ resource "aws_launch_template" "app" {
 
   metadata_options {
     http_endpoint               = "enabled"
-    http_tokens                 = "required" # IMDSv2 requis pour la securite
+    http_tokens                 = "required"
     http_put_response_hop_limit = 2
   }
 
@@ -116,7 +116,7 @@ resource "aws_launch_template" "app" {
 # Auto Scaling Group (ASG)
 resource "aws_autoscaling_group" "app" {
   name_prefix         = "mymusic-asg-"
-  vpc_zone_identifier = aws_subnet.private_app[*].id
+  vpc_zone_identifier = data.aws_subnets.default.ids
   target_group_arns   = [aws_lb_target_group.app.arn]
 
   min_size         = var.min_size
