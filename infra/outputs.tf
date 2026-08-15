@@ -18,6 +18,11 @@ output "s3_deploy_bucket_name" {
   value       = aws_s3_bucket.deploy.id
 }
 
+output "asg_name" {
+  description = "Nom de l'Auto Scaling Group"
+  value       = aws_autoscaling_group.app.name
+}
+
 output "rds_endpoint" {
   description = "Endpoint de la base de données RDS MySQL"
   value       = aws_db_instance.mysql.endpoint

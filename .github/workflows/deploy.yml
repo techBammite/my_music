@@ -73,7 +73,7 @@ jobs:
 
       - name: Trigger EC2 Auto Scaling Group Instance Refresh
         run: |
-          ASG_NAME=$(aws autoscaling describe-auto-scaling-groups --query "AutoScalingGroups[?contains(AutoScalingGroupName, 'mymusic-asg')].AutoScalingGroupName" --output text)
+          ASG_NAME=$(cd infra && terraform output -raw asg_name)
           if [ -n "$ASG_NAME" ]; then
             echo "Triggering Instance Refresh on ASG: $ASG_NAME"
             aws autoscaling start-instance-refresh --auto-scaling-group-name "$ASG_NAME" --preferences '{"MinHealthyPercentage": 50}'
