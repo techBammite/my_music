@@ -28,7 +28,7 @@ resource "aws_db_instance" "mysql" {
   multi_az                = var.multi_az_db
   publicly_accessible     = false
   skip_final_snapshot     = true
-  backup_retention_period = 7
+  backup_retention_period = 1
 
   tags = {
     Name = "mymusic-rds-mysql"

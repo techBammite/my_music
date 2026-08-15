@@ -25,9 +25,7 @@ resource "aws_iam_policy" "ec2_policy" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = [
-          "Allow"
-        ]
+        Effect = "Allow"
         Action = [
           "s3:GetObject",
           "s3:PutObject",
@@ -42,9 +40,7 @@ resource "aws_iam_policy" "ec2_policy" {
         ]
       },
       {
-        Effect = [
-          "Allow"
-        ]
+        Effect = "Allow"
         Action = [
           "secretsmanager:GetSecretValue"
         ]
