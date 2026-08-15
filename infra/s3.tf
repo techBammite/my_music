@@ -1,10 +1,10 @@
-resource "random_id" "suffix" {
-  byte_length = 4
+locals {
+  suffix = "d62d99a1" # Suffixe fixe pour réutiliser le même bucket et éviter la création de doublons
 }
 
 # Bucket S3 pour les médias (audios et couvertures)
 resource "aws_s3_bucket" "media" {
-  bucket        = "mymusic-media-${random_id.suffix.hex}"
+  bucket        = "mymusic-media-${local.suffix}"
   force_destroy = true
 
   tags = {
@@ -35,7 +35,7 @@ resource "aws_s3_bucket_cors_configuration" "media" {
 
 # Bucket S3 pour les déploiements de code applicatif (releases zip)
 resource "aws_s3_bucket" "deploy" {
-  bucket        = "mymusic-deploy-${random_id.suffix.hex}"
+  bucket        = "mymusic-deploy-${local.suffix}"
   force_destroy = true
 
   tags = {

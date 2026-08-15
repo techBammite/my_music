@@ -1,6 +1,6 @@
 # IAM Role pour EC2
 resource "aws_iam_role" "ec2_role" {
-  name = "mymusic-ec2-role-${random_id.suffix.hex}"
+  name = "mymusic-ec2-role-${local.suffix}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -18,7 +18,7 @@ resource "aws_iam_role" "ec2_role" {
 
 # Policy d'acces S3 et Secrets Manager pour EC2
 resource "aws_iam_policy" "ec2_policy" {
-  name        = "mymusic-ec2-policy-${random_id.suffix.hex}"
+  name        = "mymusic-ec2-policy-${local.suffix}"
   description = "Autorise EC2 a lire les secrets et a interagir avec S3"
 
   policy = jsonencode({
@@ -60,6 +60,6 @@ resource "aws_iam_role_policy_attachment" "ec2_attach" {
 
 # Instance Profile pour l'ASG EC2
 resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "mymusic-ec2-instance-profile-${random_id.suffix.hex}"
+  name = "mymusic-ec2-instance-profile-${local.suffix}"
   role = aws_iam_role.ec2_role.name
 }

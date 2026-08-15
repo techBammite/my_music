@@ -1,6 +1,6 @@
 # CloudFront Origin Access Control pour S3
 resource "aws_cloudfront_origin_access_control" "oac" {
-  name                              = "mymusic-s3-oac-${random_id.suffix.hex}"
+  name                              = "mymusic-s3-oac-${local.suffix}"
   description                       = "OAC pour acceder au bucket media S3 de My Music"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"

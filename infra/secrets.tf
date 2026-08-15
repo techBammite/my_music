@@ -7,7 +7,7 @@ resource "random_password" "db_password" {
 
 # Secret DB MySQL
 resource "aws_secretsmanager_secret" "db_credentials" {
-  name                    = "mymusic/db_credentials_${random_id.suffix.hex}"
+  name                    = "mymusic/db_credentials_${local.suffix}"
   recovery_window_in_days = 0
 }
 
@@ -24,7 +24,7 @@ resource "aws_secretsmanager_secret_version" "db_credentials" {
 
 # Secret SMTP Hostinger
 resource "aws_secretsmanager_secret" "smtp_credentials" {
-  name                    = "mymusic/smtp_credentials_${random_id.suffix.hex}"
+  name                    = "mymusic/smtp_credentials_${local.suffix}"
   recovery_window_in_days = 0
 }
 
