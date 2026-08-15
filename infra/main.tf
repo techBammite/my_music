@@ -12,13 +12,12 @@ terraform {
     }
   }
 
-  # Pour activer le backend remote S3 après la création initiale du bucket S3:
-  # backend "s3" {
-  #   bucket         = "mymusic-tf-state-bucket"
-  #   key            = "terraform.tfstate"
-  #   region         = "eu-west-3"
-  #   encrypt        = true
-  # }
+  backend "s3" {
+    bucket  = "mymusic-deploy-d62d99a1"
+    key     = "terraform/state/terraform.tfstate"
+    region  = "eu-west-3"
+    encrypt = true
+  }
 }
 
 provider "aws" {
