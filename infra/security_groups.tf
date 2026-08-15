@@ -1,7 +1,7 @@
 # Security Group pour Application Load Balancer
 resource "aws_security_group" "alb" {
   name        = "mymusic-alb-sg"
-  description = "Autorise le trafic HTTP/HTTPS entrant vers l'ALB"
+  description = "Autorise le trafic HTTP et HTTPS entrant vers ALB"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -36,11 +36,11 @@ resource "aws_security_group" "alb" {
 # Security Group pour les instances EC2 App
 resource "aws_security_group" "ec2" {
   name        = "mymusic-ec2-sg"
-  description = "Autorise le trafic vers l'application Node.js depuis l'ALB uniquement"
+  description = "Autorise le trafic vers application Node.js depuis ALB uniquement"
   vpc_id      = aws_vpc.main.id
 
   ingress {
-    description     = "Trafic Node.js depuis l'ALB"
+    description     = "Trafic Node.js depuis ALB"
     from_port       = var.app_port
     to_port         = var.app_port
     protocol        = "tcp"
@@ -48,7 +48,7 @@ resource "aws_security_group" "ec2" {
   }
 
   egress {
-    description = "Acces Internet sortant via NAT Gateway"
+    description = "Acces Internet sortant"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
@@ -63,7 +63,7 @@ resource "aws_security_group" "ec2" {
 # Security Group pour la base de donnees RDS MySQL
 resource "aws_security_group" "rds" {
   name        = "mymusic-rds-sg"
-  description = "Autorise les connexions MySQL depuis les instances EC2 applicatives uniquement"
+  description = "Autorise les connexions MySQL depuis EC2 uniquement"
   vpc_id      = aws_vpc.main.id
 
   ingress {
@@ -75,7 +75,7 @@ resource "aws_security_group" "rds" {
   }
 
   egress {
-    description = "Pas d'egress sortant inutile"
+    description = "Egress sortant RDS"
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
