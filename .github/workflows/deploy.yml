@@ -68,12 +68,17 @@ jobs:
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
             --parameters commands='[
+              "dnf install -y mariadb105-server nodejs git unzip curl awscli",
+              "systemctl enable mariadb --now",
+              "mysql -e \"CREATE DATABASE IF NOT EXISTS my_music; CREATE USER IF NOT EXISTS '\''mymusic_user'\''@'\''localhost'\'' IDENTIFIED BY '\''MyMusicPassword2026!'\''; GRANT ALL PRIVILEGES ON my_music.* TO '\''mymusic_user'\''@'\''localhost'\''; FLUSH PRIVILEGES;\"",
               "mkdir -p /var/www/mymusic",
               "cd /var/www/mymusic",
               "aws s3 cp s3://'"$DEPLOY_BUCKET"'/latest/app.zip app.zip",
               "unzip -o app.zip",
               "rm -f app.zip",
               "npm install --production",
+              "systemctl daemon-reload",
+              "systemctl enable mymusic",
               "systemctl restart mymusic"
             ]' \
             --query "Command.CommandId" \

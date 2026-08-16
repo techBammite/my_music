@@ -1,10 +1,11 @@
+# Selection de l'image officielle Amazon Linux 2023 Standard (exclut les images ECS sans systemd)
 data "aws_ami" "amazon_linux_2023" {
   most_recent = true
   owners      = ["amazon"]
 
   filter {
     name   = "name"
-    values = ["al2023-ami-*-x86_64"]
+    values = ["al2023-ami-2023.*-x86_64"]
   }
 
   filter {
@@ -102,7 +103,7 @@ resource "aws_instance" "app" {
   iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
   associate_public_ip_address = true
 
-  user_data = base64encode(local.user_data)
+  user_data = local.user_data
 
   tags = {
     Name = "mymusic-server"
