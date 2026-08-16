@@ -30,5 +30,5 @@ output "db_username" {
 
 output "connection_test_command" {
   description = "CLI Command to test connection"
-  value       = "mysql -h ${aws_db_instance.mysql.address} -P ${aws_db_instance.mysql.port} -u ${aws_db_instance.mysql.username} -p'${var.db_password}' ${aws_db_instance.mysql.db_name}"
+  value       = "mysql -h ${aws_db_instance.mysql.address} -P ${aws_db_instance.mysql.port} -u ${aws_db_instance.mysql.username} -p'MyMusicPassword2026!' ${aws_db_instance.mysql.db_name}"
 }
