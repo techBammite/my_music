@@ -63,3 +63,12 @@ resource "aws_lambda_function_url" "mail_url" {
     max_age           = 86400
   }
 }
+
+# Permission de ressource pour autoriser l'invocation publique sans authentification (Elimine l'erreur 403 Forbidden)
+resource "aws_lambda_permission" "public_url" {
+  statement_id           = "FunctionURLAllowPublicAccess"
+  action                 = "lambda:InvokeFunctionUrl"
+  function_name          = aws_lambda_function.mail.function_name
+  principal              = "*"
+  function_url_auth_type = "NONE"
+}

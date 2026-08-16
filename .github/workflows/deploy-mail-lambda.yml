@@ -1,9 +1,13 @@
-name: Deploy Mail Microservice to AWS Lambda
+name: Deploy Mail Microservice (AWS Lambda)
 
 on:
   push:
     branches:
       - main
+    paths:
+      - 'src/service_auxiliere/mail/**'
+      - 'infra/mail/**'
+      - '.github/workflows/deploy-mail-lambda.yml'
   workflow_dispatch:
 
 permissions:
@@ -11,8 +15,8 @@ permissions:
   contents: read
 
 jobs:
-  deploy-mail-lambda:
-    name: Deploy Mail Lambda Microservice
+  deploy-mail:
+    name: Deploy Mail Microservice to AWS Lambda
     runs-on: ubuntu-latest
 
     steps:
@@ -33,7 +37,7 @@ jobs:
 
       - name: Build Mail Lambda Package
         run: |
-          echo "Building mail microservice package..."
+          echo "Building mail microservice zip package..."
           cd src/service_auxiliere/mail
           npm install --production
           zip -r ../../../infra/mail/mail.zip .
@@ -56,7 +60,7 @@ jobs:
         run: terraform apply -auto-approve
         working-directory: ./infra/mail
 
-      - name: Display Lambda Function URL
+      - name: Display Public Lambda Function URL
         run: |
           LAMBDA_URL=$(cd infra/mail && terraform output -raw lambda_function_url)
           echo "=========================================================="
@@ -64,5 +68,5 @@ jobs:
           echo "🌐 Public Lambda Function URL: $LAMBDA_URL"
           echo "=========================================================="
           echo "### 🚀 Mail Microservice Deployed to AWS Lambda!" >> $GITHUB_STEP_SUMMARY
-          echo "Public URL: **[$LAMBDA_URL]($LAMBDA_URL)**" >> $GITHUB_STEP_SUMMARY
-          echo "Health Endpoint: **[$LAMBDA_URLhealth](${LAMBDA_URL}health)**" >> $GITHUB_STEP_SUMMARY
+          echo "Public Function URL: **[$LAMBDA_URL]($LAMBDA_URL)**" >> $GITHUB_STEP_SUMMARY
+          echo "Health Endpoint: **[${LAMBDA_URL}health](${LAMBDA_URL}health)**" >> $GITHUB_STEP_SUMMARY
