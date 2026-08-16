@@ -19,7 +19,7 @@ locals {
   user_data = <<-EOF
     #!/bin/bash
     set -e
-    exec > >(tee /var/log/user-data.log|tag -t user-data) 2>&1
+    exec > >(tee -a /var/log/user-data.log) 2>&1
 
     echo "=== Initialisation de l'instance EC2 MyMusic ==="
 
