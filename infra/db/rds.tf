@@ -1,29 +1,20 @@
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
 # Utilisation du VPC par defaut du compte AWS (0 risque VpcLimitExceeded)
 data "aws_vpc" "default" {
   default = true
 }
 
-# 2 subnets dedies dans 2 AZs distinctes pour le DB Subnet Group de RDS
-resource "aws_subnet" "db_subnet" {
-  count                   = 2
-  vpc_id                  = data.aws_vpc.default.id
-  cidr_block              = cidrsubnet(data.aws_vpc.default.cidr_block, 4, count.index + 12)
-  availability_zone       = data.aws_availability_zones.available.names[count.index]
-  map_public_ip_on_launch = true
-
-  tags = {
-    Name = "mymusic-db-subnet-${count.index + 1}"
+# Subnets existants du VPC par defaut (0 risque de conflit CIDR)
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
   }
 }
 
 # DB Subnet Group pour RDS
 resource "aws_db_subnet_group" "main" {
   name       = "mymusic-db-subnet-group-${local.suffix}"
-  subnet_ids = aws_subnet.db_subnet[*].id
+  subnet_ids = data.aws_subnets.default.ids
 
   tags = {
     Name = "mymusic-db-subnet-group"
