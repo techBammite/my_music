@@ -226,6 +226,14 @@ const server = http.createServer(async (req, res) => {
 });
 
 connectToDatabase()
+  .then(async () => {
+    try {
+      await ensureDatabaseSchema();
+      console.log('Base de données initialisée et schéma vérifié avec succès.');
+    } catch (schemaErr) {
+      console.warn('Erreur lors de l’initialisation du schéma de BDD :', schemaErr.message);
+    }
+  })
   .catch((error) => {
     console.error('Le serveur continue malgré l’échec de connexion à la base de données.', error.message);
   });
