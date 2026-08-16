@@ -1,8 +1,8 @@
 const { connectToDatabase } = require('../../index');
 
-async function trackDownload(req, res) {
+async function trackDownload(req, res, bodyData) {
   try {
-    const { musicId, userId } = req.body || {};
+    const { musicId, userId } = bodyData || req.body || {};
 
     if (!musicId) {
       res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });

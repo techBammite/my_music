@@ -1,8 +1,8 @@
 const { connectToDatabase } = require('../../index');
 
-async function toggleLike(req, res) {
+async function toggleLike(req, res, bodyData) {
   try {
-    const { musicId, userId, liked } = req.body || {};
+    const { musicId, userId, liked } = bodyData || req.body || {};
 
     if (!musicId) {
       res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });

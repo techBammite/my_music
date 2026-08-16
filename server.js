@@ -95,10 +95,12 @@ function parseJsonBody(req, callback) {
 
   req.on('end', () => {
     if (!body) {
+      req.body = {};
       return callback(null, {});
     }
     try {
       const parsed = JSON.parse(body);
+      req.body = parsed;
       callback(null, parsed);
     } catch (error) {
       callback(error, null);

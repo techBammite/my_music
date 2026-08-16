@@ -18,9 +18,9 @@ async function getAllMusiques(req, res) {
   }
 }
 
-async function createMusique(req, res) {
+async function createMusique(req, res, bodyData) {
   try {
-    const body = req.body || {};
+    const body = bodyData || req.body || {};
     const { title, artist, cover, audio, genre, description, user_id } = body;
 
     if (!title || !artist || !audio) {
