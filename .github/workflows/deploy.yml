@@ -74,8 +74,7 @@ jobs:
               "unzip -o app.zip",
               "rm -f app.zip",
               "npm install --production",
-              "pm2 restart mymusic || pm2 start server.js --name mymusic",
-              "pm2 save"
+              "systemctl restart mymusic"
             ]' \
             --query "Command.CommandId" \
             --output text)

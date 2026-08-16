@@ -20,14 +20,14 @@ data "aws_subnets" "default" {
   }
 }
 
-# User-data script de premier boot pour tout installer (MariaDB + Node.js + PM2)
+# User-data script de premier boot pour tout installer (MariaDB + Node.js + Systemd Service)
 locals {
   user_data = <<-EOF
     #!/bin/bash
     set -ex
     exec > >(tee -a /var/log/user-data.log) 2>&1
 
-    echo "=== Initialisation de l'instance EC2 MyMusic (Single Instance Direct Port 80) ==="
+    echo "=== Initialisation de l'instance EC2 MyMusic (Single Instance Systemd Port 80) ==="
 
     # 1. Installation des paquets requis
     dnf update -y
@@ -42,10 +42,9 @@ locals {
     mysql -e "GRANT ALL PRIVILEGES ON my_music.* TO 'mymusic_user'@'localhost';"
     mysql -e "FLUSH PRIVILEGES;"
 
-    # 4. Installation de Node.js v20 (LTS) & PM2
+    # 4. Installation de Node.js v20 (LTS)
     curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
     dnf install -y nodejs
-    npm install -g pm2
 
     # 5. Configuration du dossier applicatif
     mkdir -p /var/www/mymusic
@@ -63,23 +62,43 @@ DB_PASSWORD=MyMusicPassword2026!
 DB_NAME=my_music
 EOF_ENV
 
-    # 7. Verifier si une premiere version est dispo dans S3
+    # 7. Creation du service systemd natif pour MyMusic
+    cat << 'EOF_SERVICE' > /etc/systemd/system/mymusic.service
+[Unit]
+Description=MyMusic Node.js Application
+After=network.target mariadb.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/var/www/mymusic
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+EOF_SERVICE
+
+    systemctl daemon-reload
+    systemctl enable mymusic
+
+    # 8. Verifier si une premiere version est dispo dans S3
     DEPLOY_BUCKET="${aws_s3_bucket.deploy.id}"
     if aws s3 ls "s3://$DEPLOY_BUCKET/latest/app.zip" ; then
       aws s3 cp "s3://$DEPLOY_BUCKET/latest/app.zip" app.zip
       unzip -o app.zip
       rm -f app.zip
       npm install --production || true
-      pm2 start server.js --name "mymusic" || true
-      pm2 save
-      pm2 startup systemd -u root --hp /root || true
+      systemctl restart mymusic || true
     fi
 
     echo "=== Installation terminee avec succes ==="
   EOF
 }
 
-# 1 seule instance EC2 simple et directe (Node.js direct sur Port 80)
+# 1 seule instance EC2 simple avec service systemd natif
 resource "aws_instance" "app" {
   ami                         = data.aws_ami.amazon_linux_2023.id
   instance_type               = var.instance_type
