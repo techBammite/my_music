@@ -20,22 +20,21 @@ data "aws_subnets" "default" {
   }
 }
 
-# User-data script de premier boot pour tout installer (MariaDB + Node.js + PM2 + Nginx)
+# User-data script de premier boot pour tout installer (MariaDB + Node.js + PM2)
 locals {
   user_data = <<-EOF
     #!/bin/bash
     set -ex
     exec > >(tee -a /var/log/user-data.log) 2>&1
 
-    echo "=== Initialisation de l'instance EC2 MyMusic (Single Instance) ==="
+    echo "=== Initialisation de l'instance EC2 MyMusic (Single Instance Direct Port 80) ==="
 
     # 1. Installation des paquets requis
     dnf update -y
-    dnf install -y mariadb105-server git unzip curl awscli nginx
+    dnf install -y mariadb105-server git unzip curl awscli
 
     # 2. Demarrage et activation de MariaDB
-    systemctl enable mariadb
-    systemctl start mariadb
+    systemctl enable mariadb --now
 
     # 3. Creation de la base de donnees et de l'utilisateur
     mysql -e "CREATE DATABASE IF NOT EXISTS my_music;"
@@ -52,9 +51,9 @@ locals {
     mkdir -p /var/www/mymusic
     cd /var/www/mymusic
 
-    # 6. Fichier .env local ultra-simple
+    # 6. Fichier .env local (Ecoute directe sur le Port 80)
     cat << EOF_ENV > /var/www/mymusic/.env
-PORT=3000
+PORT=80
 HOST=0.0.0.0
 NODE_ENV=production
 DB_HOST=127.0.0.1
@@ -64,29 +63,7 @@ DB_PASSWORD=MyMusicPassword2026!
 DB_NAME=my_music
 EOF_ENV
 
-    # 7. Configuration de Nginx pour rediriger le port 80 vers Node.js (port 3000)
-    cat << 'EOF_NGINX' > /etc/nginx/conf.d/mymusic.conf
-server {
-    listen 80;
-    server_name _;
-
-    client_max_body_size 100M;
-
-    location / {
-        proxy_pass http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
-    }
-}
-EOF_NGINX
-
-    systemctl enable nginx
-    systemctl restart nginx
-
-    # 8. Verifier si une premiere version est dispo dans S3
+    # 7. Verifier si une premiere version est dispo dans S3
     DEPLOY_BUCKET="${aws_s3_bucket.deploy.id}"
     if aws s3 ls "s3://$DEPLOY_BUCKET/latest/app.zip" ; then
       aws s3 cp "s3://$DEPLOY_BUCKET/latest/app.zip" app.zip
@@ -102,16 +79,16 @@ EOF_NGINX
   EOF
 }
 
-# 1 seule instance EC2 simple et robuste (0 ASG, 0 ALB)
+# 1 seule instance EC2 simple et directe (Node.js direct sur Port 80)
 resource "aws_instance" "app" {
-  ami                    = data.aws_ami.amazon_linux_2023.id
-  instance_type          = var.instance_type
-  subnet_id              = data.aws_subnets.default.ids[0]
-  vpc_security_group_ids = [aws_security_group.app.id]
-  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
-
-  user_data                   = base64encode(local.user_data)
+  ami                         = data.aws_ami.amazon_linux_2023.id
+  instance_type               = var.instance_type
+  subnet_id                   = data.aws_subnets.default.ids[0]
+  vpc_security_group_ids      = [aws_security_group.app.id]
+  iam_instance_profile        = aws_iam_instance_profile.ec2_profile.name
   associate_public_ip_address = true
+
+  user_data = base64encode(local.user_data)
 
   tags = {
     Name = "mymusic-server"

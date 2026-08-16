@@ -61,6 +61,8 @@ jobs:
           DEPLOY_BUCKET=$(cd infra && terraform output -raw s3_deploy_bucket_name)
 
           echo "Deploying remotely on EC2 instance $INSTANCE_ID..."
+          echo "Attente de 20s pour l'enregistrement de l'agent SSM..."
+          sleep 20
 
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
