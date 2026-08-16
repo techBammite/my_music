@@ -17,44 +17,44 @@ data "aws_ami" "amazon_linux_2023" {
 # User-data Script pour initialiser l'instance EC2
 locals {
   user_data = <<-EOF
-    #!/bin/bash
-    set -e
-    exec > >(tee -a /var/log/user-data.log) 2>&1
+#!/bin/bash
+set -e
+exec > >(tee -a /var/log/user-data.log) 2>&1
 
-    echo "=== Initialisation de l'instance EC2 MyMusic ==="
+echo "=== Initialisation de l'instance EC2 MyMusic ==="
 
-    # 1. Mise a jour du systeme et installation des outils basiques
-    dnf update -y
-    dnf install -y git unzip curl awscli
+# 1. Mise a jour du systeme et installation des outils basiques
+dnf update -y
+dnf install -y git unzip curl awscli
 
-    # 2. Installation de Node.js v20 (LTS)
-    curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
-    dnf install -y nodejs
+# 2. Installation de Node.js v20 (LTS)
+curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+dnf install -y nodejs
 
-    # 3. Installation globale de PM2
-    npm install -g pm2 || { echo "Erreur: installation de PM2 a echoue"; exit 1; }
-    which pm2
-    pm2 --version
+# 3. Installation globale de PM2
+npm install -g pm2 || { echo "Erreur: installation de PM2 a echoue"; exit 1; }
+which pm2
+pm2 --version
 
-    # 4. Preparation du dossier applicatif
-    mkdir -p /var/www/mymusic
-    cd /var/www/mymusic
+# 4. Preparation du dossier applicatif
+mkdir -p /var/www/mymusic
+cd /var/www/mymusic
 
-    # 5. Telechargement de la derniere release depuis S3 (s'il en existe une)
-    DEPLOY_BUCKET="${aws_s3_bucket.deploy.id}"
-    echo "Verification du bucket de deploiement: $DEPLOY_BUCKET"
+# 5. Telechargement de la derniere release depuis S3 (s'il en existe une)
+DEPLOY_BUCKET="${aws_s3_bucket.deploy.id}"
+echo "Verification du bucket de deploiement: $DEPLOY_BUCKET"
 
-    if aws s3 ls "s3://$DEPLOY_BUCKET/latest/app.zip" ; then
-      echo "Telechargement de la release..."
-      aws s3 cp "s3://$DEPLOY_BUCKET/latest/app.zip" app.zip
-      unzip -o app.zip
-      rm -f app.zip
-    else
-      echo "Aucune release trouvee dans S3 pour l'instant. Attente du premier pipeline."
-    fi
+if aws s3 ls "s3://$DEPLOY_BUCKET/latest/app.zip" ; then
+  echo "Telechargement de la release..."
+  aws s3 cp "s3://$DEPLOY_BUCKET/latest/app.zip" app.zip
+  unzip -o app.zip
+  rm -f app.zip
+else
+  echo "Aucune release trouvee dans S3 pour l'instant. Attente du premier pipeline."
+fi
 
-    # 6. Generation du fichier .env pour Node.js
-    cat << 'EOF_ENV' > /var/www/mymusic/.env
+# 6. Generation du fichier .env pour Node.js
+cat << 'EOF_ENV' > /var/www/mymusic/.env
 PORT=3000
 HOST=0.0.0.0
 NODE_ENV=production
@@ -64,32 +64,32 @@ DB_SECRET_ARN=${aws_secretsmanager_secret.db_credentials.arn}
 SMTP_SECRET_ARN=${aws_secretsmanager_secret.smtp_credentials.arn}
 EOF_ENV
 
-    # 7. Installation des dependances npm et lancement PM2
-    if [ -f "package.json" ]; then
-      npm install --production || { echo "Erreur: npm install --production a echoue"; exit 1; }
+# 7. Installation des dependances npm et lancement PM2
+if [ -f "package.json" ]; then
+  npm install --production || { echo "Erreur: npm install --production a echoue"; exit 1; }
 
-      pm2 delete all || true
-      pm2 start server.js --name "mymusic-app" --watch false || { echo "Erreur: demarrage PM2 mymusic-app a echoue"; pm2 logs mymusic-app --lines 200 || true; exit 1; }
+  pm2 delete all || true
+  pm2 start server.js --name "mymusic-app" --watch false || { echo "Erreur: demarrage PM2 mymusic-app a echoue"; pm2 logs mymusic-app --lines 200 || true; exit 1; }
 
-      sleep 5
-      curl -fsS http://localhost:3000/healthz || { echo "Erreur: health check local a echoue sur localhost:3000"; pm2 logs mymusic-app --lines 200 || true; exit 1; }
+  sleep 5
+  curl -fsS http://localhost:3000/healthz || { echo "Erreur: health check local a echoue sur localhost:3000"; pm2 logs mymusic-app --lines 200 || true; exit 1; }
 
-      if [ -f "src/service_auxiliere/mail/mail.js" ]; then
-        cd src/service_auxiliere/mail
-        npm install --production || true
-        pm2 start mail.js --name "mymusic-mail" || true
-        cd /var/www/mymusic
-      fi
+  if [ -f "src/service_auxiliere/mail/mail.js" ]; then
+    cd src/service_auxiliere/mail
+    npm install --production || true
+    pm2 start mail.js --name "mymusic-mail" || true
+    cd /var/www/mymusic
+  fi
 
-      pm2 save
-      pm2 startup systemd -u root --hp /root || true
-    else
-      echo "Erreur: package.json absent dans /var/www/mymusic"
-      exit 1
-    fi
+  pm2 save
+  pm2 startup systemd -u root --hp /root || true
+else
+  echo "Erreur: package.json absent dans /var/www/mymusic"
+  exit 1
+fi
 
-    echo "=== Initialisation terminee avec succes ==="
-  EOF
+echo "=== Initialisation terminee avec succes ==="
+EOF
 }
 
 # Launch Template pour l'ASG
