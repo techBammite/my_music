@@ -5,7 +5,12 @@ data "aws_ami" "amazon_linux_2023" {
 
   filter {
     name   = "name"
-    values = ["al2023-ami-2023.*-x86_64"]
+    values = ["al2023-ami-2023*"]
+  }
+
+  filter {
+    name   = "architecture"
+    values = ["x86_64"]
   }
 
   filter {
@@ -21,33 +26,34 @@ data "aws_subnets" "default" {
   }
 }
 
-# User-data script de premier boot pour tout installer (MariaDB + Node.js + Systemd Service)
+# User-data script de premier boot (byte 0 #!/bin/bash sans indentation)
 locals {
-  user_data = <<-EOF
-    #!/bin/bash
-    set -x
+  user_data = <<EOF
+#!/bin/bash
+exec > >(tee -a /var/log/user-data.log) 2>&1
+set -x
 
-    echo "=== Initialisation de l'instance EC2 MyMusic ==="
+echo "=== Initialisation de l'instance EC2 MyMusic ==="
 
-    # 1. Installation des paquets requis (MariaDB, Node.js natif AL2023, Git, Unzip, AWS CLI)
-    dnf update -y
-    dnf install -y mariadb105-server nodejs git unzip curl awscli
+# 1. Installation des paquets requis (MariaDB, Node.js natif AL2023, Git, Unzip, AWS CLI)
+dnf update -y
+dnf install -y mariadb105-server nodejs git unzip curl awscli
 
-    # 2. Demarrage et activation de MariaDB
-    systemctl enable mariadb --now
+# 2. Demarrage et activation de MariaDB
+systemctl enable mariadb --now
 
-    # 3. Creation de la base de donnees et de l'utilisateur
-    mysql -e "CREATE DATABASE IF NOT EXISTS my_music;"
-    mysql -e "CREATE USER IF NOT EXISTS 'mymusic_user'@'localhost' IDENTIFIED BY 'MyMusicPassword2026!';"
-    mysql -e "GRANT ALL PRIVILEGES ON my_music.* TO 'mymusic_user'@'localhost';"
-    mysql -e "FLUSH PRIVILEGES;"
+# 3. Creation de la base de donnees et de l'utilisateur
+mysql -e "CREATE DATABASE IF NOT EXISTS my_music;"
+mysql -e "CREATE USER IF NOT EXISTS 'mymusic_user'@'localhost' IDENTIFIED BY 'MyMusicPassword2026!';"
+mysql -e "GRANT ALL PRIVILEGES ON my_music.* TO 'mymusic_user'@'localhost';"
+mysql -e "FLUSH PRIVILEGES;"
 
-    # 4. Configuration du dossier applicatif
-    mkdir -p /var/www/mymusic
-    cd /var/www/mymusic
+# 4. Configuration du dossier applicatif
+mkdir -p /var/www/mymusic
+cd /var/www/mymusic
 
-    # 5. Fichier .env local (Ecoute directe sur le Port 80)
-    cat << EOF_ENV > /var/www/mymusic/.env
+# 5. Fichier .env local (Ecoute directe sur le Port 80)
+cat << EOF_ENV > /var/www/mymusic/.env
 PORT=80
 HOST=0.0.0.0
 NODE_ENV=production
@@ -58,8 +64,8 @@ DB_PASSWORD=MyMusicPassword2026!
 DB_NAME=my_music
 EOF_ENV
 
-    # 6. Creation du service systemd natif pour MyMusic
-    cat << 'EOF_SERVICE' > /etc/systemd/system/mymusic.service
+# 6. Creation du service systemd natif pour MyMusic
+cat << 'EOF_SERVICE' > /etc/systemd/system/mymusic.service
 [Unit]
 Description=MyMusic Node.js Application
 After=network.target mariadb.service
@@ -77,21 +83,21 @@ Environment=NODE_ENV=production
 WantedBy=multi-user.target
 EOF_SERVICE
 
-    systemctl daemon-reload
-    systemctl enable mymusic
+systemctl daemon-reload
+systemctl enable mymusic
 
-    # 7. Verifier si une premiere version est dispo dans S3
-    DEPLOY_BUCKET="${aws_s3_bucket.deploy.id}"
-    if aws s3 ls "s3://$DEPLOY_BUCKET/latest/app.zip" ; then
-      aws s3 cp "s3://$DEPLOY_BUCKET/latest/app.zip" app.zip
-      unzip -o app.zip
-      rm -f app.zip
-      npm install --production || true
-      systemctl restart mymusic || true
-    fi
+# 7. Verifier si une premiere version est dispo dans S3
+DEPLOY_BUCKET="${aws_s3_bucket.deploy.id}"
+if aws s3 ls "s3://$DEPLOY_BUCKET/latest/app.zip" ; then
+  aws s3 cp "s3://$DEPLOY_BUCKET/latest/app.zip" app.zip
+  unzip -o app.zip
+  rm -f app.zip
+  npm install --production || true
+  systemctl restart mymusic || true
+fi
 
-    echo "=== Installation terminee avec succes ==="
-  EOF
+echo "=== Installation terminee avec succes ==="
+EOF
 }
 
 # 1 seule instance EC2 simple avec service systemd natif
