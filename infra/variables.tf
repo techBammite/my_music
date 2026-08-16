@@ -31,7 +31,7 @@ variable "min_size" {
 variable "max_size" {
   description = "Nombre maximal d'instances dans l'ASG"
   type        = number
-  default     = 2
+  default     = 1
 }
 
 variable "desired_capacity" {

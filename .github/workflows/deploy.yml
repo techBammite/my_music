@@ -54,29 +54,32 @@ jobs:
         run: terraform validate
         working-directory: ./infra
 
-      - name: Cleanup Old Test VPCs
+      - name: Cleanup Old Test Resources (RDS & ASG)
         run: |
-          echo "Automated Cleanup: Deleting any old failed test VPCs..."
-          VPC_IDS=$(aws ec2 describe-vpcs --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --filters "Name=tag:Name,Values=*mymusic-vpc*" --query "Vpcs[*].VpcId" --output text || echo "")
-          for vpc_id in $VPC_IDS; do
-            if [ -n "$vpc_id" ] && [ "$vpc_id" != "None" ]; then
-              echo "Cleaning up VPC: $vpc_id"
-              IGW_IDS=$(aws ec2 describe-internet-gateways --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --filters "Name=attachment.vpc-id,Values=$vpc_id" --query "InternetGateways[*].InternetGatewayId" --output text || echo "")
-              for igw_id in $IGW_IDS; do
-                if [ -n "$igw_id" ] && [ "$igw_id" != "None" ]; then
-                  aws ec2 detach-internet-gateway --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --internet-gateway-id "$igw_id" --vpc-id "$vpc_id" || true
-                  aws ec2 delete-internet-gateway --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --internet-gateway-id "$igw_id" || true
-                fi
-              done
-              SUBNET_IDS=$(aws ec2 describe-subnets --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --filters "Name=vpc-id,Values=$vpc_id" --query "Subnets[*].SubnetId" --output text || echo "")
-              for sub_id in $SUBNET_IDS; do
-                if [ -n "$sub_id" ] && [ "$sub_id" != "None" ]; then
-                  aws ec2 delete-subnet --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --subnet-id "$sub_id" || true
-                fi
-              done
-              aws ec2 delete-vpc --region ${{ secrets.AWS_REGION || 'eu-west-3' }} --vpc-id "$vpc_id" || true
+          echo "Automated Cleanup: Cleaning up old test RDS instances and ASGs to free quotas..."
+          REGION="${{ secrets.AWS_REGION || 'eu-west-3' }}"
+
+          # Cleanup old test RDS instances
+          RDS_IDS=$(aws rds describe-db-instances --region $REGION --query "DBInstances[*].DBInstanceIdentifier" --output text || echo "")
+          for rds_id in $RDS_IDS; do
+            if [ -n "$rds_id" ] && [ "$rds_id" != "None" ]; then
+              echo "Deleting old test RDS instance: $rds_id"
+              aws rds delete-db-instance --region $REGION --db-instance-identifier "$rds_id" --skip-final-snapshot --delete-automated-backups || true
             fi
           done
+
+          # Cleanup old test Auto Scaling Groups
+          ASG_NAMES=$(aws autoscaling describe-auto-scaling-groups --region $REGION --query "AutoScalingGroups[*].AutoScalingGroupName" --output text || echo "")
+          for asg in $ASG_NAMES; do
+            if [ -n "$asg" ] && [ "$asg" != "None" ]; then
+              echo "Force deleting old test ASG: $asg"
+              aws autoscaling delete-auto-scaling-group --region $REGION --auto-scaling-group-name "$asg" --force-delete || true
+            fi
+          done
+
+          # Attente courte pour la libération des quotas
+          echo "Attente de 30s pour la libération des quotas..."
+          sleep 30
 
       - name: Terraform Apply
         id: apply
