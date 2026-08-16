@@ -54,7 +54,7 @@ else
 fi
 
 # 6. Generation du fichier .env pour Node.js
-cat << 'EOF_ENV' > /var/www/mymusic/.env
+cat << EOF_ENV > /var/www/mymusic/.env
 PORT=3000
 HOST=0.0.0.0
 NODE_ENV=production

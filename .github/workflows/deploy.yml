@@ -81,15 +81,15 @@ jobs:
           echo "Attente de 30s pour la libération des quotas..."
           sleep 30
 
-      - name: Terraform Apply
-        id: apply
-        run: terraform apply -auto-approve
-        working-directory: ./infra
-
       - name: Package Application Artifact
         run: |
           echo "Packaging application code..."
           zip -r app.zip . -x "node_modules/*" ".git/*" "infra/*" ".github/*" "uploads/*"
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve
+        working-directory: ./infra
 
       - name: Upload Release Artifact to S3
         run: |
