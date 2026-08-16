@@ -1,7 +1,7 @@
 # Subnet Group pour RDS dans les subnets du VPC par defaut
 resource "aws_db_subnet_group" "main" {
   name       = "mymusic-db-subnet-group-${local.suffix}"
-  subnet_ids = data.aws_subnets.default.ids
+  subnet_ids = aws_subnet.app_subnet[*].id
 
   tags = {
     Name = "mymusic-db-subnet-group"

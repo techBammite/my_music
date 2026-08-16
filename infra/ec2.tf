@@ -130,7 +130,7 @@ resource "aws_launch_template" "app" {
 # Auto Scaling Group (ASG)
 resource "aws_autoscaling_group" "app" {
   name_prefix         = "mymusic-asg-"
-  vpc_zone_identifier = data.aws_subnets.default.ids
+  vpc_zone_identifier = aws_subnet.app_subnet[*].id
   target_group_arns   = [aws_lb_target_group.app.arn]
 
   min_size         = var.min_size
