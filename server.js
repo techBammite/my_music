@@ -12,7 +12,7 @@ const { toggleLike } = require('./src/backend/routes/likes');
 const { handleUpload } = require('./src/backend/routes/upload');
 const { register, verifyOtp, login } = require('./src/backend/routes/auth');
 
-const hostname = process.env.HOST || '0.0.0.0';
+const hostname = process.env.HOST || '0.0.0.0'; 
 const port = process.env.PORT || 3000;
 const frontendDir = path.join(__dirname, 'src', 'frontend');
 const MAX_JSON_BODY_SIZE = 1024 * 1024 * 100;
