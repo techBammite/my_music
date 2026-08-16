@@ -1,65 +1,50 @@
-# IAM Role pour EC2
 resource "aws_iam_role" "ec2_role" {
   name = "mymusic-ec2-role-${local.suffix}"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
+    Statement = [{
+      Action = "sts:AssumeRole"
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
       }
-    ]
+    }]
   })
+
+  tags = {
+    Name = "mymusic-ec2-role"
+  }
 }
 
-# Policy d'acces S3 et Secrets Manager pour EC2
-resource "aws_iam_policy" "ec2_policy" {
-  name        = "mymusic-ec2-policy-${local.suffix}"
-  description = "Autorise EC2 a lire les secrets et a interagir avec S3"
+# SSM access (deploy commands from GitHub Actions)
+resource "aws_iam_role_policy_attachment" "ssm" {
+  role       = aws_iam_role.ec2_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
+# S3 read access (pull code from deploy bucket)
+resource "aws_iam_role_policy" "s3_read" {
+  name = "mymusic-s3-read"
+  role = aws_iam_role.ec2_role.id
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.media.arn,
-          "${aws_s3_bucket.media.arn}/*",
-          aws_s3_bucket.deploy.arn,
-          "${aws_s3_bucket.deploy.arn}/*"
-        ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "secretsmanager:GetSecretValue"
-        ]
-        Resource = [
-          aws_secretsmanager_secret.db_credentials.arn,
-          aws_secretsmanager_secret.smtp_credentials.arn
-        ]
-      }
-    ]
+    Statement = [{
+      Effect = "Allow"
+      Action = [
+        "s3:GetObject",
+        "s3:ListBucket"
+      ]
+      Resource = [
+        aws_s3_bucket.deploy.arn,
+        "${aws_s3_bucket.deploy.arn}/*"
+      ]
+    }]
   })
 }
 
-resource "aws_iam_role_policy_attachment" "ec2_attach" {
-  role       = aws_iam_role.ec2_role.name
-  policy_arn = aws_iam_policy.ec2_policy.arn
-}
-
-# Instance Profile pour l'ASG EC2
 resource "aws_iam_instance_profile" "ec2_profile" {
-  name = "mymusic-ec2-instance-profile-${local.suffix}"
+  name = "mymusic-ec2-profile-${local.suffix}"
   role = aws_iam_role.ec2_role.name
 }

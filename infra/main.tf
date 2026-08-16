@@ -1,6 +1,8 @@
 terraform {
   required_version = ">= 1.9.0"
 
+  backend "s3" {}
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
@@ -8,21 +10,13 @@ terraform {
     }
     random = {
       source  = "hashicorp/random"
-      version = "~> 3.5"
+      version = "~> 3.0"
     }
   }
 }
 
 provider "aws" {
   region = var.aws_region
-
-  default_tags {
-    tags = {
-      Project     = "MyMusic"
-      Environment = var.environment
-      ManagedBy   = "Terraform"
-    }
-  }
 }
 
 resource "random_id" "suffix" {

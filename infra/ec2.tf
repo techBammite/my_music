@@ -1,4 +1,3 @@
-# Data source pour la derniere AMI Amazon Linux 2023
 data "aws_ami" "amazon_linux_2023" {
   most_recent = true
   owners      = ["amazon"]
@@ -14,161 +13,107 @@ data "aws_ami" "amazon_linux_2023" {
   }
 }
 
-# User-data Script pour initialiser l'instance EC2
+data "aws_subnets" "default" {
+  filter {
+    name   = "vpc-id"
+    values = [data.aws_vpc.default.id]
+  }
+}
+
+# User-data script de premier boot pour tout installer (MariaDB + Node.js + PM2 + Nginx)
 locals {
   user_data = <<-EOF
-#!/bin/bash
-set -e
-exec > >(tee -a /var/log/user-data.log) 2>&1
+    #!/bin/bash
+    set -ex
+    exec > >(tee -a /var/log/user-data.log) 2>&1
 
-echo "=== Initialisation de l'instance EC2 MyMusic ==="
+    echo "=== Initialisation de l'instance EC2 MyMusic (Single Instance) ==="
 
-# 1. Mise a jour du systeme et installation des outils basiques
-dnf update -y
-dnf install -y git unzip curl awscli
+    # 1. Installation des paquets requis
+    dnf update -y
+    dnf install -y mariadb105-server git unzip curl awscli nginx
 
-# 2. Installation de Node.js v20 (LTS)
-curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
-dnf install -y nodejs
+    # 2. Demarrage et activation de MariaDB
+    systemctl enable mariadb
+    systemctl start mariadb
 
-# 3. Installation globale de PM2
-npm install -g pm2 || { echo "Erreur: installation de PM2 a echoue"; exit 1; }
-which pm2
-pm2 --version
+    # 3. Creation de la base de donnees et de l'utilisateur
+    mysql -e "CREATE DATABASE IF NOT EXISTS my_music;"
+    mysql -e "CREATE USER IF NOT EXISTS 'mymusic_user'@'localhost' IDENTIFIED BY 'MyMusicPassword2026!';"
+    mysql -e "GRANT ALL PRIVILEGES ON my_music.* TO 'mymusic_user'@'localhost';"
+    mysql -e "FLUSH PRIVILEGES;"
 
-# 4. Preparation du dossier applicatif
-mkdir -p /var/www/mymusic
-cd /var/www/mymusic
+    # 4. Installation de Node.js v20 (LTS) & PM2
+    curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
+    dnf install -y nodejs
+    npm install -g pm2
 
-# 5. Telechargement de la derniere release depuis S3 (s'il en existe une)
-DEPLOY_BUCKET="${aws_s3_bucket.deploy.id}"
-echo "Verification du bucket de deploiement: $DEPLOY_BUCKET"
+    # 5. Configuration du dossier applicatif
+    mkdir -p /var/www/mymusic
+    cd /var/www/mymusic
 
-if aws s3 ls "s3://$DEPLOY_BUCKET/latest/app.zip" ; then
-  echo "Telechargement de la release..."
-  aws s3 cp "s3://$DEPLOY_BUCKET/latest/app.zip" app.zip
-  unzip -o app.zip
-  rm -f app.zip
-else
-  echo "Aucune release trouvee dans S3 pour l'instant. Attente du premier pipeline."
-fi
-
-# 6. Generation du fichier .env pour Node.js
-cat << EOF_ENV > /var/www/mymusic/.env
+    # 6. Fichier .env local ultra-simple
+    cat << EOF_ENV > /var/www/mymusic/.env
 PORT=3000
 HOST=0.0.0.0
 NODE_ENV=production
-AWS_REGION=${var.aws_region}
-AWS_S3_BUCKET=${aws_s3_bucket.media.id}
-DB_SECRET_ARN=${aws_secretsmanager_secret.db_credentials.arn}
-SMTP_SECRET_ARN=${aws_secretsmanager_secret.smtp_credentials.arn}
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=mymusic_user
+DB_PASSWORD=MyMusicPassword2026!
+DB_NAME=my_music
 EOF_ENV
 
-# 7. Installation des dependances npm et lancement PM2
-if [ -f "package.json" ]; then
-  npm install --production || { echo "Erreur: npm install --production a echoue"; exit 1; }
+    # 7. Configuration de Nginx pour rediriger le port 80 vers Node.js (port 3000)
+    cat << 'EOF_NGINX' > /etc/nginx/conf.d/mymusic.conf
+server {
+    listen 80;
+    server_name _;
 
-  pm2 delete all || true
-  pm2 start server.js --name "mymusic-app" --watch false || { echo "Erreur: demarrage PM2 mymusic-app a echoue"; pm2 logs mymusic-app --lines 200 || true; exit 1; }
+    client_max_body_size 100M;
 
-  sleep 5
-  curl -fsS http://localhost:3000/healthz || { echo "Erreur: health check local a echoue sur localhost:3000"; pm2 logs mymusic-app --lines 200 || true; exit 1; }
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+EOF_NGINX
 
-  if [ -f "src/service_auxiliere/mail/mail.js" ]; then
-    cd src/service_auxiliere/mail
-    npm install --production || true
-    pm2 start mail.js --name "mymusic-mail" || true
-    cd /var/www/mymusic
-  fi
+    systemctl enable nginx
+    systemctl restart nginx
 
-  pm2 save
-  pm2 startup systemd -u root --hp /root || true
-else
-  echo "Erreur: package.json absent dans /var/www/mymusic"
-  exit 1
-fi
+    # 8. Verifier si une premiere version est dispo dans S3
+    DEPLOY_BUCKET="${aws_s3_bucket.deploy.id}"
+    if aws s3 ls "s3://$DEPLOY_BUCKET/latest/app.zip" ; then
+      aws s3 cp "s3://$DEPLOY_BUCKET/latest/app.zip" app.zip
+      unzip -o app.zip
+      rm -f app.zip
+      npm install --production || true
+      pm2 start server.js --name "mymusic" || true
+      pm2 save
+      pm2 startup systemd -u root --hp /root || true
+    fi
 
-echo "=== Initialisation terminee avec succes ==="
-EOF
+    echo "=== Installation terminee avec succes ==="
+  EOF
 }
 
-# Launch Template pour l'ASG
-resource "aws_launch_template" "app" {
-  name_prefix   = "mymusic-launch-template-"
-  image_id      = data.aws_ami.amazon_linux_2023.id
-  instance_type = var.instance_type
+# 1 seule instance EC2 simple et robuste (0 ASG, 0 ALB)
+resource "aws_instance" "app" {
+  ami                    = data.aws_ami.amazon_linux_2023.id
+  instance_type          = var.instance_type
+  subnet_id              = data.aws_subnets.default.ids[0]
+  vpc_security_group_ids = [aws_security_group.app.id]
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
-  iam_instance_profile {
-    name = aws_iam_instance_profile.ec2_profile.name
-  }
+  user_data                   = base64encode(local.user_data)
+  associate_public_ip_address = true
 
-  network_interfaces {
-    associate_public_ip_address = true
-    security_groups             = [aws_security_group.ec2.id]
-  }
-
-  user_data = base64encode(local.user_data)
-
-  metadata_options {
-    http_endpoint               = "enabled"
-    http_tokens                 = "required"
-    http_put_response_hop_limit = 2
-  }
-
-  tag_specifications {
-    resource_type = "instance"
-    tags = {
-      Name = "mymusic-ec2-instance"
-    }
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Auto Scaling Group (ASG)
-resource "aws_autoscaling_group" "app" {
-  name_prefix         = "mymusic-asg-"
-  vpc_zone_identifier = aws_subnet.app_subnet[*].id
-  target_group_arns   = [aws_lb_target_group.app.arn]
-
-  min_size         = var.min_size
-  max_size         = var.max_size
-  desired_capacity = var.desired_capacity
-
-  force_delete              = true
-  health_check_type         = "ELB"
-  health_check_grace_period = 300
-
-  launch_template {
-    id      = aws_launch_template.app.id
-    version = "$Latest"
-  }
-
-  instance_refresh {
-    strategy = "Rolling"
-    preferences {
-      min_healthy_percentage = 50
-    }
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-# Politique de Target Tracking Auto Scaling basee sur l'utilisation CPU
-resource "aws_autoscaling_policy" "cpu_policy" {
-  name                   = "mymusic-cpu-scaling-policy"
-  autoscaling_group_name = aws_autoscaling_group.app.name
-  policy_type            = "TargetTrackingScaling"
-
-  target_tracking_configuration {
-    predefined_metric_specification {
-      predefined_metric_type = "ASGAverageCPUUtilization"
-    }
-
-    target_value = 60.0
+  tags = {
+    Name = "mymusic-server"
   }
 }

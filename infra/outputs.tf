@@ -1,30 +1,19 @@
-output "alb_dns_name" {
-  description = "Nom DNS de l'Application Load Balancer"
-  value       = aws_lb.main.dns_name
+output "instance_id" {
+  description = "EC2 Instance ID"
+  value       = aws_instance.app.id
 }
 
-output "cloudfront_domain_name" {
-  description = "Nom de domaine de la distribution CloudFront"
-  value       = aws_cloudfront_distribution.cdn.domain_name
+output "public_ip" {
+  description = "Public IP address of the EC2 instance"
+  value       = aws_instance.app.public_ip
 }
 
-output "s3_media_bucket_name" {
-  description = "Nom du bucket S3 pour les médias (audios/covers)"
-  value       = aws_s3_bucket.media.id
+output "app_url" {
+  description = "Public HTTP URL of the MyMusic application"
+  value       = "http://${aws_instance.app.public_ip}"
 }
 
 output "s3_deploy_bucket_name" {
-  description = "Nom du bucket S3 pour les releases de code applicatif"
+  description = "S3 bucket for code deployment"
   value       = aws_s3_bucket.deploy.id
-}
-
-output "asg_name" {
-  description = "Nom de l'Auto Scaling Group"
-  value       = aws_autoscaling_group.app.name
-}
-
-output "rds_endpoint" {
-  description = "Endpoint de la base de données RDS MySQL"
-  value       = aws_db_instance.mysql.endpoint
-  sensitive   = true
 }
