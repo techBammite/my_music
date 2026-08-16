@@ -4,6 +4,6 @@ output "lambda_function_name" {
 }
 
 output "lambda_function_url" {
-  description = "Public Function URL of the Mail Lambda microservice"
-  value       = aws_lambda_function_url.mail_url.function_url
+  description = "Public API Gateway HTTP Endpoint for Mail microservice"
+  value       = aws_apigatewayv2_stage.default.invoke_url
 }
