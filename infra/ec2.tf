@@ -51,23 +51,26 @@ locals {
       echo "Aucune release trouvee dans S3 pour l'instant. Attente du premier pipeline."
     fi
 
-    # 6. Installation des dependances npm si package.json existe
+    # 6. Generation du fichier .env pour Node.js
+    cat << 'EOF_ENV' > /var/www/mymusic/.env
+PORT=3000
+HOST=0.0.0.0
+NODE_ENV=production
+AWS_REGION=${var.aws_region}
+AWS_S3_BUCKET=${aws_s3_bucket.media.id}
+DB_SECRET_ARN=${aws_secretsmanager_secret.db_credentials.arn}
+SMTP_SECRET_ARN=${aws_secretsmanager_secret.smtp_credentials.arn}
+EOF_ENV
+
+    # 7. Installation des dependances npm et lancement PM2
     if [ -f "package.json" ]; then
-      npm install --production
+      npm install --production || true
 
-      # Definition des variables d'environnement
-      export PORT=3000
-      export NODE_ENV=production
-      export AWS_REGION="${var.aws_region}"
-      export AWS_S3_BUCKET="${aws_s3_bucket.media.id}"
-      export DB_SECRET_ARN="${aws_secretsmanager_secret.db_credentials.arn}"
-      export SMTP_SECRET_ARN="${aws_secretsmanager_secret.smtp_credentials.arn}"
-
-      # Lancement de l'application via PM2
+      pm2 delete all || true
       pm2 start server.js --name "mymusic-app"
       
       if [ -f "src/service_auxiliere/mail/mail.js" ]; then
-        cd src/service_auxiliere/mail && npm install --production && pm2 start mail.js --name "mymusic-mail" && cd /var/www/mymusic
+        cd src/service_auxiliere/mail && npm install --production || true && pm2 start mail.js --name "mymusic-mail" && cd /var/www/mymusic
       fi
 
       pm2 save
