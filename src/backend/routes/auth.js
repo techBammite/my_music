@@ -3,9 +3,9 @@ const bcrypt = require('bcrypt');
 
 const pendingUsers = new Map(); // Stockage temporaire en mémoire des inscriptions en cours
 
-async function register(req, res) {
+async function register(req, res, bodyData) {
   try {
-    const { username, email, password, confirmPassword } = req.body || {};
+    const { username, email, password, confirmPassword } = bodyData || req.body || {};
 
     if (!username || !email || !password || !confirmPassword) {
       res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -39,9 +39,11 @@ async function register(req, res) {
     // Générer OTP à 6 chiffres
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    // Envoyer l'OTP via le microservice mail
+    // Envoyer l'OTP via le microservice mail déploie sur AWS Lambda
+    const mailEndpoint = process.env.MAIL_SERVICE_URL || 'https://k60d9w3g69.execute-api.eu-west-3.amazonaws.com/send';
+
     try {
-      const mailResponse = await fetch('http://127.0.0.1:4001/send', {
+      const mailResponse = await fetch(mailEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -61,7 +63,7 @@ async function register(req, res) {
       });
 
       const mailResult = await mailResponse.json();
-      if (!mailResponse.ok || !mailResult.success) {
+      if (!mailResponse.ok || (!mailResult.success && !mailResult.messageId)) {
         throw new Error(mailResult.error || 'Erreur lors de l\'envoi de l\'email');
       }
     } catch (mailError) {
@@ -89,9 +91,9 @@ async function register(req, res) {
   }
 }
 
-async function verifyOtp(req, res) {
+async function verifyOtp(req, res, bodyData) {
   try {
-    const { email, otp } = req.body || {};
+    const { email, otp } = bodyData || req.body || {};
 
     if (!email || !otp) {
       res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
@@ -144,9 +146,9 @@ async function verifyOtp(req, res) {
   }
 }
 
-async function login(req, res) {
+async function login(req, res, bodyData) {
   try {
-    const { email, password } = req.body || {};
+    const { email, password } = bodyData || req.body || {};
 
     if (!email || !password) {
       res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
