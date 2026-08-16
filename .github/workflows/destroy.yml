@@ -2,6 +2,11 @@ name: Destroy AWS Infrastructure
 
 on:
   workflow_dispatch:
+    inputs:
+      confirm_destroy:
+        description: 'Tape "destroy" pour confirmer la destruction de l’infra AWS.'
+        required: true
+        default: ''
 
 permissions:
   contents: read
@@ -28,10 +33,21 @@ jobs:
         with:
           terraform_version: 1.9.5
 
+      - name: Confirm destructive action
+        run: |
+          if [ "${{ github.event.inputs.confirm_destroy }}" != "destroy" ]; then
+            echo "Destroy non confirmé. Tapez 'destroy' dans le champ confirm_destroy pour continuer."
+            exit 1
+          fi
+
       - name: Terraform Init
-        run: terraform init
+        run: terraform init -input=false
+        working-directory: ./infra
+
+      - name: Terraform Plan Destroy
+        run: terraform plan -destroy -input=false -no-color -out=tfplan
         working-directory: ./infra
 
       - name: Terraform Destroy
-        run: terraform destroy -auto-approve
+        run: terraform destroy -auto-approve -input=false -no-color
         working-directory: ./infra
