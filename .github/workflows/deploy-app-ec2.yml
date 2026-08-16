@@ -1,0 +1,106 @@
+name: Deploy Main Application (EC2)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'server.js'
+      - 'src/**'
+      - 'package.json'
+      - 'infra/app/**'
+      - '.github/workflows/deploy-app-ec2.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-app:
+    name: Deploy Main Application to EC2
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-3' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+
+      - name: Terraform Init
+        run: terraform init -input=false
+        working-directory: ./infra/app
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ./infra/app
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve
+        working-directory: ./infra/app
+
+      - name: Package Application Code
+        run: |
+          echo "Packaging application zip..."
+          zip -r app.zip . -x "node_modules/*" ".git/*" "infra/*" ".github/*" "uploads/*"
+
+      - name: Upload Release to S3
+        run: |
+          DEPLOY_BUCKET=$(cd infra/app && terraform output -raw s3_deploy_bucket_name)
+          echo "Uploading code to s3://$DEPLOY_BUCKET/latest/app.zip..."
+          aws s3 cp app.zip "s3://$DEPLOY_BUCKET/latest/app.zip"
+
+      - name: Remote Deploy via AWS SSM Command
+        run: |
+          INSTANCE_ID=$(cd infra/app && terraform output -raw instance_id)
+          DEPLOY_BUCKET=$(cd infra/app && terraform output -raw s3_deploy_bucket_name)
+
+          echo "Deploying application remotely on EC2 instance $INSTANCE_ID..."
+          echo "Attente de 15s pour l'enregistrement de l'agent SSM..."
+          sleep 15
+
+          COMMAND_ID=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name "AWS-RunShellScript" \
+            --parameters commands='[
+              "dnf install -y nodejs git unzip curl awscli",
+              "mkdir -p /var/www/mymusic",
+              "cd /var/www/mymusic",
+              "aws s3 cp s3://'"$DEPLOY_BUCKET"'/latest/app.zip app.zip",
+              "unzip -o app.zip",
+              "rm -f app.zip",
+              "cat << EOF_ENV > /var/www/mymusic/.env\nPORT=80\nHOST=0.0.0.0\nNODE_ENV=production\nDB_HOST=mymusic-db-952b3825.cbi2io2eyuyd.eu-west-3.rds.amazonaws.com\nDB_PORT=3306\nDB_USER=mymusic_admin\nDB_PASSWORD=MyMusicPassword2026!\nDB_NAME=my_music\nEOF_ENV",
+              "cat << EOF_SERVICE > /etc/systemd/system/mymusic.service\n[Unit]\nDescription=MyMusic Main Application\nAfter=network.target\n\n[Service]\nType=simple\nUser=root\nWorkingDirectory=/var/www/mymusic\nExecStart=/usr/bin/node server.js\nRestart=always\nRestartSec=5\nEnvironment=NODE_ENV=production\nEnvironment=PORT=80\nEnvironment=HOST=0.0.0.0\n\n[Install]\nWantedBy=multi-user.target\nEOF_SERVICE",
+              "npm install --production",
+              "systemctl daemon-reload",
+              "systemctl enable mymusic",
+              "systemctl restart mymusic"
+            ]' \
+            --query "Command.CommandId" \
+            --output text)
+
+          echo "SSM Command sent with ID: $COMMAND_ID. Waiting for completion..."
+          aws ssm wait command-executed --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" || true
+          aws ssm get-command-invocation --command-id "$COMMAND_ID" --instance-id "$INSTANCE_ID" --query "StandardOutputContent" --output text
+
+      - name: Display Application Web URL
+        run: |
+          APP_URL=$(cd infra/app && terraform output -raw app_url)
+          PUBLIC_IP=$(cd infra/app && terraform output -raw public_ip)
+          echo "=========================================================="
+          echo "🎉 MYMUSIC MAIN APPLICATION DEPLOYED SUCCESSFULLY!"
+          echo "🌐 Live Website URL: $APP_URL"
+          echo "=========================================================="
+          echo "### 🚀 Main Application Deployed to EC2!" >> $GITHUB_STEP_SUMMARY
+          echo "Access your live website here: **[$APP_URL]($APP_URL)**" >> $GITHUB_STEP_SUMMARY
