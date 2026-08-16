@@ -1,0 +1,121 @@
+name: Deploy RDS Database (MySQL 8.0)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'infra/db/**'
+      - '.github/workflows/deploy-db-rds.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-rds:
+    name: Deploy RDS MySQL Database
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-3' }}
+
+      - name: Cleanup Old RDS Instances (Quota Protection)
+        run: |
+          echo "Checking for old test RDS instances to free Free Tier quota..."
+          REGION="${{ secrets.AWS_REGION || 'eu-west-3' }}"
+          RDS_IDS=$(aws rds describe-db-instances --region $REGION --query "DBInstances[*].DBInstanceIdentifier" --output text || echo "")
+          for rds_id in $RDS_IDS; do
+            if [ -n "$rds_id" ] && [ "$rds_id" != "None" ] && [[ "$rds_id" != mymusic-db-* ]]; then
+              echo "Deleting old non-matching test RDS instance: $rds_id"
+              aws rds delete-db-instance --region $REGION --db-instance-identifier "$rds_id" --skip-final-snapshot --delete-automated-backups || true
+            fi
+          done
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+
+      - name: Terraform Init
+        run: terraform init -input=false
+        working-directory: ./infra/db
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ./infra/db
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve
+        working-directory: ./infra/db
+
+      - name: Setup Node.js & Install mysql2
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Verify Database Connectivity & Health
+        run: |
+          npm install mysql2
+          DB_HOST=$(cd infra/db && terraform output -raw db_host)
+          DB_PORT=$(cd infra/db && terraform output -raw db_port)
+          DB_NAME=$(cd infra/db && terraform output -raw db_name)
+          DB_USER=$(cd infra/db && terraform output -raw db_username)
+
+          echo "Testing connection to RDS MySQL at $DB_HOST:$DB_PORT/$DB_NAME..."
+
+          node -e "
+          const mysql = require('mysql2/promise');
+          async function testConn() {
+            try {
+              const conn = await mysql.createConnection({
+                host: '$DB_HOST',
+                port: Number('$DB_PORT'),
+                user: '$DB_USER',
+                password: 'MyMusicPassword2026!',
+                database: '$DB_NAME',
+                connectTimeout: 20000
+              });
+              const [rows] = await conn.query('SELECT 1 + 1 AS ping_result, NOW() as server_time');
+              console.log('✅ Connexion RDS réussie ! Résultat du ping:', rows[0]);
+              await conn.end();
+              process.exit(0);
+            } catch (err) {
+              console.error('❌ Échec de connexion RDS:', err.message);
+              process.exit(1);
+            }
+          }
+          testConn();
+          "
+
+      - name: Display Database Details
+        run: |
+          DB_HOST=$(cd infra/db && terraform output -raw db_host)
+          DB_PORT=$(cd infra/db && terraform output -raw db_port)
+          DB_NAME=$(cd infra/db && terraform output -raw db_name)
+          DB_USER=$(cd infra/db && terraform output -raw db_username)
+          CMD=$(cd infra/db && terraform output -raw connection_test_command)
+
+          echo "=========================================================="
+          echo "🎉 RDS MYSQL DATABASE DEPLOYED & TESTED SUCCESSFULLY!"
+          echo "🌐 Host: $DB_HOST"
+          echo "📌 Port: $DB_PORT"
+          echo "🗄️ Database: $DB_NAME"
+          echo "👤 Username: $DB_USER"
+          echo "=========================================================="
+          echo "### 🚀 RDS MySQL Database Deployed & Tested!" >> $GITHUB_STEP_SUMMARY
+          echo "- **Host**: \`$DB_HOST\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Port**: \`$DB_PORT\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Database**: \`$DB_NAME\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Username**: \`$DB_USER\`" >> $GITHUB_STEP_SUMMARY
+          echo "- **Test Command**: \`$CMD\`" >> $GITHUB_STEP_SUMMARY
