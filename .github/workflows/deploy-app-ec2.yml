@@ -73,20 +73,17 @@ jobs:
           COMMAND_ID=$(aws ssm send-command \
             --instance-ids "$INSTANCE_ID" \
             --document-name "AWS-RunShellScript" \
-            --parameters commands='[
-              "dnf install -y nodejs git unzip curl awscli",
+            --parameters '{"commands": [
               "mkdir -p /var/www/mymusic",
               "cd /var/www/mymusic",
               "aws s3 cp s3://'"$DEPLOY_BUCKET"'/latest/app.zip app.zip",
               "unzip -o app.zip",
               "rm -f app.zip",
-              "cat << EOF_ENV > /var/www/mymusic/.env\nPORT=80\nHOST=0.0.0.0\nNODE_ENV=production\nDB_HOST=mymusic-db-952b3825.cbi2io2eyuyd.eu-west-3.rds.amazonaws.com\nDB_PORT=3306\nDB_USER=mymusic_admin\nDB_PASSWORD=MyMusicPassword2026!\nDB_NAME=my_music\nEOF_ENV",
-              "cat << EOF_SERVICE > /etc/systemd/system/mymusic.service\n[Unit]\nDescription=MyMusic Main Application\nAfter=network.target\n\n[Service]\nType=simple\nUser=root\nWorkingDirectory=/var/www/mymusic\nExecStart=/usr/bin/node server.js\nRestart=always\nRestartSec=5\nEnvironment=NODE_ENV=production\nEnvironment=PORT=80\nEnvironment=HOST=0.0.0.0\n\n[Install]\nWantedBy=multi-user.target\nEOF_SERVICE",
               "npm install --production",
               "systemctl daemon-reload",
               "systemctl enable mymusic",
               "systemctl restart mymusic"
-            ]' \
+            ]}' \
             --query "Command.CommandId" \
             --output text)
 
