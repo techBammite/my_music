@@ -92,7 +92,7 @@ echo "=== Initialisation de l'instance EC2 Application MyMusic ==="
 
 # 1. Installation des paquets requis (Node.js natif AL2023, Git, Unzip, AWS CLI)
 dnf update -y
-dnf install -y nodejs git unzip curl awscli
+dnf install -y --allowerasing nodejs npm git unzip curl awscli net-tools
 
 # 2. Preparation du dossier applicatif
 mkdir -p /var/www/mymusic
@@ -120,7 +120,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/var/www/mymusic
-ExecStart=/usr/bin/node server.js
+ExecStart=/usr/bin/env node server.js
 Restart=always
 RestartSec=5
 Environment=NODE_ENV=production

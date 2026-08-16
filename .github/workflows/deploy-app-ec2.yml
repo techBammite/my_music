@@ -74,7 +74,7 @@ jobs:
             --document-name "AWS-RunShellScript" \
             --parameters '{"commands": [
               "echo \"=== 1. INSTALLATION DEPENDANCES & PREPARATION Dossier ===\"",
-              "dnf install -y nodejs git unzip curl awscli net-tools",
+              "dnf install -y --allowerasing nodejs npm git unzip curl awscli net-tools",
               "mkdir -p /var/www/mymusic",
               "cd /var/www/mymusic",
               "aws s3 cp s3://'"$DEPLOY_BUCKET"'/latest/app.zip app.zip",
@@ -85,7 +85,7 @@ jobs:
               "echo \"=== 2. CREATION FICHIER .ENV & SERVICE SYSTEMD ===\"",
               "cat << \"EOF_ENV\" > /var/www/mymusic/.env\nPORT=80\nHOST=0.0.0.0\nNODE_ENV=production\nDB_HOST=mymusic-db-952b3825.cbi2io2eyuyd.eu-west-3.rds.amazonaws.com\nDB_PORT=3306\nDB_USER=mymusic_admin\nDB_PASSWORD=MyMusicPassword2026!\nDB_NAME=my_music\nEOF_ENV",
 
-              "cat << \"EOF_SERVICE\" > /etc/systemd/system/mymusic.service\n[Unit]\nDescription=MyMusic Application\nAfter=network.target\n\n[Service]\nType=simple\nUser=root\nWorkingDirectory=/var/www/mymusic\nExecStart=/usr/bin/node server.js\nRestart=always\nRestartSec=5\nEnvironment=NODE_ENV=production\nEnvironment=PORT=80\nEnvironment=HOST=0.0.0.0\nEnvironment=DB_HOST=mymusic-db-952b3825.cbi2io2eyuyd.eu-west-3.rds.amazonaws.com\nEnvironment=DB_PORT=3306\nEnvironment=DB_USER=mymusic_admin\nEnvironment=DB_PASSWORD=MyMusicPassword2026!\nEnvironment=DB_NAME=my_music\n\n[Install]\nWantedBy=multi-user.target\nEOF_SERVICE",
+              "cat << \"EOF_SERVICE\" > /etc/systemd/system/mymusic.service\n[Unit]\nDescription=MyMusic Application\nAfter=network.target\n\n[Service]\nType=simple\nUser=root\nWorkingDirectory=/var/www/mymusic\nExecStart=/usr/bin/env node server.js\nRestart=always\nRestartSec=5\nEnvironment=NODE_ENV=production\nEnvironment=PORT=80\nEnvironment=HOST=0.0.0.0\nEnvironment=DB_HOST=mymusic-db-952b3825.cbi2io2eyuyd.eu-west-3.rds.amazonaws.com\nEnvironment=DB_PORT=3306\nEnvironment=DB_USER=mymusic_admin\nEnvironment=DB_PASSWORD=MyMusicPassword2026!\nEnvironment=DB_NAME=my_music\n\n[Install]\nWantedBy=multi-user.target\nEOF_SERVICE",
 
               "systemctl daemon-reload",
               "systemctl enable mymusic",
@@ -109,7 +109,7 @@ jobs:
               "  echo \"=== 4. ACTIVATION DU SERVEUR DE SECOURS (FALLBACK HTML) ===\"",
               "  cat << \"EOF_FB\" > /var/www/mymusic/fallback.js\nconst http = require(\"http\");\nhttp.createServer((req, res) => {\n  res.writeHead(200, { \"Content-Type\": \"text/html; charset=utf-8\" });\n  res.end(\"<!DOCTYPE html><html><head><meta charset=\\\"UTF-8\\\"><title>MyMusic - Test</title><style>body{font-family:sans-serif;background:#0f172a;color:#f8fafc;display:flex;justify-content:center;align-items:center;height:100vh;margin:0;} .card{background:#1e293b;padding:2.5rem;border-radius:1rem;text-align:center;} h1{color:#22c55e;}</style></head><body><div class=\\\"card\\\"><h1>🚀 Serveur EC2 Accessible (Fallback HTML)</h1><p>Le serveur Web EC2 réponds sur le port 80 !</p></div></body></html>\");\n}).listen(80, \"0.0.0.0\", () => console.log(\"Fallback running on port 80\"));\nEOF_FB",
 
-              "  cat << \"EOF_SERVICE_FB\" > /etc/systemd/system/mymusic.service\n[Unit]\nDescription=MyMusic Application Fallback\nAfter=network.target\n\n[Service]\nType=simple\nUser=root\nWorkingDirectory=/var/www/mymusic\nExecStart=/usr/bin/node fallback.js\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOF_SERVICE_FB",
+              "  cat << \"EOF_SERVICE_FB\" > /etc/systemd/system/mymusic.service\n[Unit]\nDescription=MyMusic Application Fallback\nAfter=network.target\n\n[Service]\nType=simple\nUser=root\nWorkingDirectory=/var/www/mymusic\nExecStart=/usr/bin/env node fallback.js\nRestart=always\nRestartSec=5\n\n[Install]\nWantedBy=multi-user.target\nEOF_SERVICE_FB",
 
               "  systemctl daemon-reload",
               "  systemctl restart mymusic",
