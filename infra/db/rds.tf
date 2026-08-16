@@ -33,7 +33,7 @@ resource "aws_db_subnet_group" "main" {
 # Security Group pour RDS MySQL (Port 3306 accessible publiquement pour faciliter les tests)
 resource "aws_security_group" "rds" {
   name_prefix = "mymusic-db-sg-"
-  description = "Security group pour l'instance RDS MySQL MyMusic"
+  description = "Security group pour instance RDS MySQL MyMusic"
   vpc_id      = data.aws_vpc.default.id
 
   ingress {
