@@ -24,14 +24,13 @@ data "aws_subnets" "default" {
 locals {
   user_data = <<-EOF
     #!/bin/bash
-    set -ex
-    exec > >(tee -a /var/log/user-data.log) 2>&1
+    set -x
 
-    echo "=== Initialisation de l'instance EC2 MyMusic (Single Instance Systemd Port 80) ==="
+    echo "=== Initialisation de l'instance EC2 MyMusic ==="
 
-    # 1. Installation des paquets requis
+    # 1. Installation des paquets requis (MariaDB, Node.js natif AL2023, Git, Unzip, AWS CLI)
     dnf update -y
-    dnf install -y mariadb105-server git unzip curl awscli
+    dnf install -y mariadb105-server nodejs git unzip curl awscli
 
     # 2. Demarrage et activation de MariaDB
     systemctl enable mariadb --now
@@ -42,15 +41,11 @@ locals {
     mysql -e "GRANT ALL PRIVILEGES ON my_music.* TO 'mymusic_user'@'localhost';"
     mysql -e "FLUSH PRIVILEGES;"
 
-    # 4. Installation de Node.js v20 (LTS)
-    curl -fsSL https://rpm.nodesource.com/setup_20.x | bash -
-    dnf install -y nodejs
-
-    # 5. Configuration du dossier applicatif
+    # 4. Configuration du dossier applicatif
     mkdir -p /var/www/mymusic
     cd /var/www/mymusic
 
-    # 6. Fichier .env local (Ecoute directe sur le Port 80)
+    # 5. Fichier .env local (Ecoute directe sur le Port 80)
     cat << EOF_ENV > /var/www/mymusic/.env
 PORT=80
 HOST=0.0.0.0
@@ -62,7 +57,7 @@ DB_PASSWORD=MyMusicPassword2026!
 DB_NAME=my_music
 EOF_ENV
 
-    # 7. Creation du service systemd natif pour MyMusic
+    # 6. Creation du service systemd natif pour MyMusic
     cat << 'EOF_SERVICE' > /etc/systemd/system/mymusic.service
 [Unit]
 Description=MyMusic Node.js Application
@@ -84,7 +79,7 @@ EOF_SERVICE
     systemctl daemon-reload
     systemctl enable mymusic
 
-    # 8. Verifier si une premiere version est dispo dans S3
+    # 7. Verifier si une premiere version est dispo dans S3
     DEPLOY_BUCKET="${aws_s3_bucket.deploy.id}"
     if aws s3 ls "s3://$DEPLOY_BUCKET/latest/app.zip" ; then
       aws s3 cp "s3://$DEPLOY_BUCKET/latest/app.zip" app.zip
