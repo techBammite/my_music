@@ -131,6 +131,24 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Proxy vers le microservice Moment (Lambda ou local)
+  if (req.method === 'GET' && pathname === '/api/time-of-day') {
+    const momentEndpoint = process.env.MOMENT_SERVICE_URL || 'http://127.0.0.1:3004/api/time-of-day';
+    fetch(momentEndpoint)
+      .then((response) => response.json())
+      .then((data) => {
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify(data));
+      })
+      .catch(() => {
+        const currentHour = new Date().getHours();
+        const period = (currentHour >= 6 && currentHour < 18) ? 'matin' : 'soir';
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ success: true, period, hour: currentHour, source: 'fallback' }));
+      });
+    return;
+  }
+
   // Verification du schema de base de donnees
   if (req.method === 'GET' && pathname === '/api/checkdb') {
     ensureDatabaseSchema()

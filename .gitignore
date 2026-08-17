@@ -4,3 +4,4 @@ uploads
 *.zip
 .terraform
 .terraform.lock.hcl
+rapport

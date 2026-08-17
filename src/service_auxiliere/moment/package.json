@@ -1,7 +1,7 @@
 {
   "name": "moment",
   "version": "1.0.0",
-  "description": "",
+  "description": "Microservice Moment pour determiner l'heure et le moment de la journee",
   "license": "ISC",
   "author": "",
   "type": "commonjs",
@@ -11,6 +11,7 @@
     "dev": "nodemon moment.js"
   },
   "dependencies": {
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "serverless-http": "^3.2.0"
   }
 }

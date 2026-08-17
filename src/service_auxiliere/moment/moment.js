@@ -17,12 +17,7 @@ app.use((req, res, next) => {
     next();
 });
 
-/**
- * Route principale : Détermine si c'est le matin ou le soir
- * Matin : de 06:00 à 17:59
- * Soir : de 18:00 à 05:59
- */
-app.get('/api/time-of-day', (req, res) => {
+function getTimeOfDayData() {
     const currentHour = new Date().getHours();
     let period = '';
 
@@ -32,12 +27,22 @@ app.get('/api/time-of-day', (req, res) => {
         period = 'soir';
     }
 
-    res.json({
+    return {
         success: true,
+        service: 'moment',
         hour: currentHour,
         period: period,
         message: `Actuellement, c'est le ${period}.`
-    });
+    };
+}
+
+// Route principale & route /api/time-of-day
+app.get('/', (req, res) => {
+    res.json(getTimeOfDayData());
+});
+
+app.get('/api/time-of-day', (req, res) => {
+    res.json(getTimeOfDayData());
 });
 
 // Gestion des routes inconnues
@@ -45,7 +50,11 @@ app.use((req, res) => {
     res.status(404).json({ error: "Route non trouvée" });
 });
 
-// Démarrage du serveur
-app.listen(PORT, () => {
-    console.log(`Microservice démarré sur le port ${PORT}`);
-});
+// Démarrage local si exécuté en direct (hors Lambda)
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Microservice moment démarré sur le port ${PORT}`);
+    });
+}
+
+module.exports = app;
