@@ -1,14 +1,17 @@
 {
   "name": "my-music-upload-service",
   "version": "1.0.0",
-  "description": "Microservice de téléchargement et stockage de contenus multimédias pour My Music",
+  "description": "Microservice de téléchargement, stockage S3 et enregistrement BDD pour My Music",
   "main": "upload.js",
   "scripts": {
     "start": "node upload.js",
-    "dev": "nodemon moment.js"
+    "dev": "nodemon upload.js"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.500.0",
     "express": "^4.21.2",
-    "multer": "^1.4.1"
+    "multer": "^1.4.5-lts.1",
+    "mysql2": "^3.11.0",
+    "serverless-http": "^3.2.0"
   }
 }

@@ -1,0 +1,72 @@
+name: Deploy Upload Microservice (AWS Lambda)
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/service_auxiliere/upload/**'
+      - 'infra/upload/**'
+      - '.github/workflows/deploy-upload-lambda.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy-upload:
+    name: Deploy Upload Service to AWS Lambda
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Upload Microservice Dependencies
+        run: |
+          cd src/service_auxiliere/upload
+          npm install --production
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'eu-west-3' }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.5
+
+      - name: Terraform Init
+        run: terraform init -input=false
+        working-directory: ./infra/upload
+
+      - name: Terraform Validate
+        run: terraform validate
+        working-directory: ./infra/upload
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -auto-approve
+        working-directory: ./infra/upload
+
+      - name: Display Upload Service Live URL
+        run: |
+          URL=$(cd infra/upload && terraform output -raw lambda_function_url)
+          BUCKET=$(cd infra/upload && terraform output -raw media_s3_bucket_name)
+          echo "=========================================================="
+          echo "🎉 UPLOAD LAMBDA SERVICE DEPLOYED SUCCESSFULLY!"
+          echo "🌐 Live Public URL: $URL"
+          echo "🪣 Media S3 Bucket: $BUCKET"
+          echo "=========================================================="
+          echo "### 🚀 Upload Microservice Deployed to AWS Lambda!" >> $GITHUB_STEP_SUMMARY
+          echo "Public Endpoint: **[$URL]($URL)**" >> $GITHUB_STEP_SUMMARY
+          echo "Media S3 Bucket: **\`$BUCKET\`**" >> $GITHUB_STEP_SUMMARY
